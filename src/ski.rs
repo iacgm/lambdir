@@ -1,12 +1,17 @@
+use crate::combinator;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Combinator {
     S,
     K,
-    // Combinators are stored in reverse
-    App(Vec<Combinator>),
-    // Basically for testing/debugging
-    Var(char),
-    // QoL
+
+    T, // Tuple
+    Add,
+    Eq,
+
+    N(i32), // Number
+
+    App(Vec<Combinator>), // Combinators are stored in reverse
     Named(&'static str, Box<Combinator>),
 }
 
@@ -15,6 +20,9 @@ impl Combinator {
     pub const BASIS: &[(&'static str, Combinator, usize)] = &[
         ("S", Self::S, 3),
         ("K", Self::K, 2),
+        ("+", Self::Add, 2),
+        ("=", Self::Eq, 2),
+        ("T", Self::T, 1),
     ];
 
     pub fn normal_form(&self, limit: usize) -> Option<Self> {
@@ -28,25 +36,26 @@ impl Combinator {
     }
 
     // Put everything in terms of S & K
-    pub fn sk_ify(&mut self) {
+    pub fn simplify(&mut self) {
+        use Combinator::*;
         match self {
-            Self::S | Self::K | Self::Var(_) => (),
-            Self::Named(_, def_box) => {
-                let def = std::mem::replace(def_box.as_mut(), Self::S);
+            Named(_, def_box) => {
+                let def = std::mem::replace(def_box.as_mut(), S);
                 *self = def;
-                self.sk_ify()
+                self.simplify()
             }
-            Self::App(terms) => match &terms[..] {
-                [_] | [.., Self::App(_)] => {
+            App(terms) => match &terms[..] {
+                [_] | [.., App(_)] => {
                     self.reduce();
-                    self.sk_ify()
+                    self.simplify()
                 }
                 _ => {
                     for term in terms {
-                        term.sk_ify()
+                        term.simplify()
                     }
                 }
             },
+            _ => (),
         }
     }
 
@@ -62,26 +71,25 @@ impl Combinator {
 
         *limit -= 1;
 
+        use Combinator::*;
         match self {
-            Self::S | Self::K | Self::Var(_) => true,
+            Named(_, def) => def.normalize_with(limit),
 
-            Self::Named(_, def) => def.normalize_with(limit),
-
-            Self::App(terms) => match &terms[..] {
+            App(terms) => match &terms[..] {
                 [] => unreachable!(),
                 [_] => {
                     *self = terms.pop().unwrap();
-                    true
+                    self.normalize_with(limit)
                 }
-                [.., Self::App(_)] => {
-                    let Self::App(head) = terms.pop().unwrap() else {
+                [.., App(_)] => {
+                    let App(head) = terms.pop().unwrap() else {
                         unreachable!()
                     };
                     terms.extend(head);
                     self.normalize_with(limit)
                 }
 
-                [.., Self::Named(_, _)] => {
+                [.., Named(_, _)] => {
                     let named = terms.last_mut().unwrap();
                     named.normalize_with(limit);
 
@@ -89,18 +97,57 @@ impl Combinator {
                     self.normalize_with(limit)
                 }
 
-                [_, _, _, Self::S] | [_, _, Self::K] => {
+                [.., _, _, Eq] => {
+                    let at = terms.len() - 3;
+                    let mut args = terms.split_off(at);
+                    let _ = args.pop();
+                    let mut p = args.pop().unwrap();
+                    let mut q = args.pop().unwrap();
+
+                    p.normalize_with(limit);
+                    q.normalize_with(limit);
+
+                    use Combinator::N;
+                    let (N(p), N(q)) = (p, q) else { unreachable!() };
+
+                    // T x y ~> x
+                    // F x y ~> y
+                    if p == q {
+                        terms.push(K);
+                    } else {
+                        terms.push(combinator!(K (S K K)));
+                    }
+                    self.normalize_with(limit)
+                }
+                [.., _, _, Add] => {
+                    let at = terms.len() - 3;
+                    let mut args = terms.split_off(at);
+                    let _ = args.pop();
+                    let mut p = args.pop().unwrap();
+                    let mut q = args.pop().unwrap();
+
+                    p.normalize_with(limit);
+                    q.normalize_with(limit);
+
+                    use Combinator::N;
+                    let (N(p), N(q)) = (p, q) else { unreachable!() };
+
+                    terms.push(N(p + q));
+                    self.normalize_with(limit)
+                }
+
+                [_, _, _, S] | [_, _, K] => {
                     self.reduce();
                     self.normalize_with(limit)
                 }
 
-                [.., _x, _g, _f, Self::S] => {
+                [.., _x, _g, _f, S] => {
                     let _s = terms.pop().unwrap();
                     let f = terms.pop().unwrap();
                     let g = terms.pop().unwrap();
                     let x = terms.pop().unwrap();
 
-                    terms.push(Self::App(vec![x, g, f, Self::S]));
+                    terms.push(App(vec![x, g, f, S]));
 
                     let redex = terms.last_mut().unwrap();
 
@@ -111,12 +158,12 @@ impl Combinator {
                     }
                 }
 
-                [.., _y, _x, Self::K] => {
+                [.., _y, _x, K] => {
                     let _k = terms.pop().unwrap();
                     let x = terms.pop().unwrap();
                     let y = terms.pop().unwrap();
 
-                    terms.push(Self::App(vec![y, x, Self::K]));
+                    terms.push(App(vec![y, x, K]));
 
                     let redex = terms.last_mut().unwrap();
 
@@ -132,6 +179,7 @@ impl Combinator {
                     .rev()
                     .all(|term| term.normalize_with(limit)),
             },
+            _ => true,
         }
     }
 
@@ -233,12 +281,10 @@ impl Combinator {
 
 impl std::fmt::Display for Combinator {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        use Combinator::*;
         match self {
-            Self::S => write!(fmt, "S"),
-            Self::K => write!(fmt, "K"),
-            Self::Var(var) => write!(fmt, "{}", var),
-            Self::Named(name, _) => write!(fmt, "{}", name),
-            Self::App(combs) => {
+            Named(name, _) => write!(fmt, "{}", name),
+            App(combs) => {
                 for comb in combs.iter().rev() {
                     if comb.size() == 1 {
                         write!(fmt, "{}", comb)?;
@@ -248,6 +294,11 @@ impl std::fmt::Display for Combinator {
                 }
                 Ok(())
             }
+            N(n) => write!(fmt, "{}", n),
+            c => match Combinator::BASIS.iter().find(|s| &s.1 == c) {
+                Some(c) => write!(fmt, "{}", c.0),
+                _ => unreachable!(),
+            },
         }
     }
 }

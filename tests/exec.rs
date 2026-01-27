@@ -21,12 +21,16 @@ fn isomorphism() {
         combinator!(C K K K),       // ~~> K K
         combinator!(Y (K K)),       // ~~> K
         combinator!(S (K S) K K K), // ~~> S (K (S K)) K
+        combinator!(+ 2 4),         // ~~> 6
+        combinator!(= (+ 2 2) 4),   // ~~> K
     ];
 
     for case in test_cases {
         let expected = case
             .normal_form(LIMIT)
             .expect("Execution did not terminate in time");
+
+        println!(">{:?}", expected);
 
         gen_fs(TEST_DIR, case).expect("Could not generate directory.");
         exec_fs(TEST_DIR);

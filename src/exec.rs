@@ -37,6 +37,11 @@ pub fn reduce_fs<P: AsRef<Path>>(path: P) -> bool {
                 [] => unreachable!(),
                 [c] => {
                     let name = get_name(c);
+
+                    if &name[..1] == "N" {
+                        return false;
+                    }
+
                     let Some((_, comb, n)) = Combinator::BASIS.iter().find(|s| s.0 == name) else {
                         // Not in head normal form
                         rename(c, "tmp").unwrap();
@@ -44,8 +49,9 @@ pub fn reduce_fs<P: AsRef<Path>>(path: P) -> bool {
                         rename("tmp", head_path).unwrap();
                         return true;
                     };
+
                     if count < *n {
-                        return false;
+                        return ps.iter().any(reduce_fs);
                     }
 
                     let out_path = nth(*n);
@@ -75,11 +81,75 @@ pub fn reduce_fs<P: AsRef<Path>>(path: P) -> bool {
                             rename(&tmp, out_path).unwrap();
                         }
                         K => {
-                            let x = nth(1);
-
                             remove_dir_all(head_path).unwrap();
                             remove_dir_all(nth(2)).unwrap();
+
+                            let x = nth(1);
                             rename(x, out_path).unwrap();
+                        }
+                        Eq => {
+                            let x = &nth(1);
+                            if reduce_fs(x) {
+                                return true;
+                            }
+
+                            let y = &nth(2);
+                            if reduce_fs(y) {
+                                return true;
+                            }
+
+                            remove_dir_all(head_path).unwrap();
+                            let n = |p: &PathBuf| {
+                                let children = ls_dir(p);
+                                assert_eq!(children.len(), 1);
+
+                                let name = get_name(&children[0]);
+                                assert_eq!(&name[..1], "N");
+                                remove_dir_all(p).unwrap();
+
+                                name[1..].parse::<i32>().unwrap();
+                            };
+
+                            let p = n(x);
+                            let q = n(y);
+
+                            let _ = remove_dir_all(&out_path);
+                            create_dir(&out_path).unwrap();
+                            if p == q {
+                                create_dir(out_path.join("K")).unwrap();
+                            } else {
+                                create_dir_all(out_path.join("1/K")).unwrap();
+                                create_dir_all(out_path.join("0/2/S")).unwrap();
+                                create_dir_all(out_path.join("0/1/K")).unwrap();
+                                create_dir_all(out_path.join("0/0/K")).unwrap();
+                            }
+                        }
+                        Add => {
+                            let x = &nth(1);
+                            if reduce_fs(x) {
+                                return true;
+                            }
+
+                            let y = &nth(2);
+                            if reduce_fs(y) {
+                                return true;
+                            }
+
+                            remove_dir_all(head_path).unwrap();
+                            let mut s = 0;
+                            for p in &[x, y] {
+                                let children = ls_dir(p);
+                                assert_eq!(children.len(), 1);
+
+                                let name = get_name(&children[0]);
+                                assert_eq!(&name[..1], "N");
+
+                                s += name[1..].parse::<i32>().unwrap();
+                                remove_dir_all(p).unwrap();
+                            }
+                            let _ = remove_dir_all(&out_path);
+                            create_dir(&out_path).unwrap();
+                            create_dir(out_path.join(format!("N{}", s))).unwrap();
                         }
                         _ => unreachable!(),
                     }

@@ -10,9 +10,6 @@ pub fn gen_fs<P: AsRef<Path>>(name: P, combinator: &Combinator) -> Result<(), Er
 
     use Combinator::*;
     match combinator {
-        S => create_dir(path.join("S")),
-        K => create_dir(path.join("K")),
-        Var(v) => create_dir(path.join(format!("{}", v))),
         Named(_, combinator) => gen_fs(path, combinator),
         App(combinators) => {
             for (i, comb) in combinators.iter().enumerate() {
@@ -20,6 +17,11 @@ pub fn gen_fs<P: AsRef<Path>>(name: P, combinator: &Combinator) -> Result<(), Er
             }
             Ok(())
         }
+        N(n) => create_dir(path.join(format!("N{}", n))),
+        c => match Combinator::BASIS.iter().find(|s| &s.1 == c) {
+            Some(c) => create_dir(path.join(c.0)),
+            _ => unreachable!(),
+        },
     }
 }
 
@@ -32,6 +34,12 @@ pub fn read_fs<P: AsRef<Path>>(name: P) -> Result<Combinator, Error> {
         [] => Err(Error::other("Empty Combinator.")),
         [path] => {
             let name = get_name(path);
+
+            if &name[..1] == "N" {
+                let value = name[1..].parse().map_err(Error::other)?;
+                return Ok(N(value));
+            }
+
             match Combinator::BASIS.iter().find(|s| s.0 == name) {
                 Some(c) => Ok(c.1.clone()),
                 _ => Err(Error::other(format!("Unrecognized symbol: `{}`", name))),

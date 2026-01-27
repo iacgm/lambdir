@@ -12,7 +12,7 @@ fn serdes() {
 
     for case in test_cases {
         let mut case = case.clone();
-        case.sk_ify();
+        case.simplify();
         gen_fs(TEST_DIR, &case).expect("Could not generate dir.");
         assert_eq!(&case, &read_fs(TEST_DIR).unwrap());
     }
