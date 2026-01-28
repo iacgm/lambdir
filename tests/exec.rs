@@ -11,8 +11,6 @@ fn isomorphism() {
     let C: Combinator = combinator!(S (S (K B) S) (K K));
     let W: Combinator = combinator!(S S (S K));
 
-    let Y: Combinator = combinator!(S S (S (S (K S) K)) (K (S (S K K) (S K K))));
-
     let test_cases: &[Combinator] = &[
         combinator!(S S S S),        // ~~> SS(SS)
         combinator!(K K K),          // ~~> K

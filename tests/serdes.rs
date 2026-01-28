@@ -5,7 +5,6 @@ const TEST_DIR: &'static str = "test_gen";
 #[test]
 fn serdes() {
     #[allow(non_snake_case)]
-    let Y: Combinator = combinator!(S S (S (S (K S) K)) (K (S (S K K) (S K K))));
     let test_cases: &[Combinator] = &[
         combinator!(Y (K K)), // ~~> K
     ];

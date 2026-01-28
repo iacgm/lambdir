@@ -2,6 +2,7 @@
 macro_rules! combinator {
 	(S) => { $crate::Combinator::S };
 	(K) => { $crate::Combinator::K };
+	(Y) => { $crate::Combinator::Y };
 	(T) => { $crate::Combinator::T };
 	(+) => { $crate::Combinator::Add };
 	(=) => { $crate::Combinator::Eq };

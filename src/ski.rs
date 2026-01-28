@@ -4,6 +4,7 @@ use crate::combinator;
 pub enum Combinator {
     S,
     K,
+    Y,
 
     T, // Tuple
     Add,
@@ -20,6 +21,7 @@ impl Combinator {
     pub const BASIS: &[(&'static str, Combinator, usize)] = &[
         ("S", Self::S, 3),
         ("K", Self::K, 2),
+        ("Y", Self::Y, 1),
         ("+", Self::Add, 2),
         ("=", Self::Eq, 2),
         ("T", Self::T, 1),
@@ -94,6 +96,14 @@ impl Combinator {
                     named.normalize_with(limit);
 
                     self.reduce();
+                    self.normalize_with(limit)
+                }
+                [.., _f, Y] => {
+                    let _ = terms.pop().unwrap();
+                    let f = terms.pop().unwrap();
+
+                    terms.push(App(vec![f.clone(), Y]));
+                    terms.push(f);
                     self.normalize_with(limit)
                 }
                 [ps @ .., _, T] => {

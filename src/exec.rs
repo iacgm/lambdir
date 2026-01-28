@@ -196,6 +196,16 @@ pub fn reduce_fs<P: AsRef<Path>>(path: P) -> bool {
                             copy_dir(tmp.join("1"), out_path.join("1")).unwrap();
                             safe_rename(tmp, out_path.join("0"));
                         }
+                        Y => {
+                            remove_dir_all(&head_path).unwrap();
+
+                            let tmp = &path.join("tmp");
+                            create_dir_all(tmp.join("0")).unwrap();
+                            copy_dir(nth(1), tmp.join("1")).unwrap();
+                            safe_rename(nth(1), tmp.join("0/0"));
+                            create_dir_all(tmp.join("0/1/Y")).unwrap();
+                            safe_rename(tmp, out_path);
+                        }
                         T => {
                             let cont = &nth(n);
                             let tmp = &path.join("tmp");
