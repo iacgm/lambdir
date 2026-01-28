@@ -96,7 +96,47 @@ impl Combinator {
                     self.reduce();
                     self.normalize_with(limit)
                 }
+                [ps @ .., _, T] => {
+                    let nargs = ps.len();
+                    let _ = terms.pop().unwrap();
+                    let mut n = terms.pop().unwrap();
+                    n.normalize_with(limit);
+                    let N(n) = n else { unreachable!() };
+                    if n < 0 {
+                        return false;
+                    }
 
+                    if nargs < (n + 1) as usize {
+                        return terms.iter_mut().all(|n| n.normalize_with(limit));
+                    }
+
+                    let last = terms.len() - 1;
+                    let f = terms.remove(last - n as usize);
+                    terms.push(f);
+
+                    self.normalize_with(limit)
+                }
+                [.., N(n)] if *n < 0 => false,
+                [.., _, _, N(0)] => {
+                    let _n = terms.pop().unwrap();
+                    let _f = terms.pop().unwrap();
+
+                    self.normalize_with(limit)
+                }
+                [.., _, _, N(n)] => {
+                    let rec = N(*n - 1);
+
+                    let _n = terms.pop().unwrap();
+                    let f = terms.pop().unwrap();
+                    let x = terms.pop().unwrap();
+
+                    #[rustfmt::skip]
+                    terms.push(App(vec![
+                        App(vec![x, f.clone(), rec]),
+                        f
+                    ]));
+                    self.normalize_with(limit)
+                }
                 [.., _, _, Eq] => {
                     let at = terms.len() - 3;
                     let mut args = terms.split_off(at);
@@ -286,10 +326,10 @@ impl std::fmt::Display for Combinator {
             Named(name, _) => write!(fmt, "{}", name),
             App(combs) => {
                 for comb in combs.iter().rev() {
-                    if comb.size() == 1 {
-                        write!(fmt, "{}", comb)?;
-                    } else {
+                    if comb.size() != 1 || matches!(comb, N(_)) {
                         write!(fmt, "({})", comb)?;
+                    } else {
+                        write!(fmt, "{}", comb)?;
                     }
                 }
                 Ok(())
