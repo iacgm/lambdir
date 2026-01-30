@@ -29,8 +29,8 @@ impl Combinator {
         ("+", Self::Add, 2),
         ("=", Self::Eq, 2),
         ("T", Self::T, 1),
-        ("R", Self::Read, 1),
-        ("P", Self::Show, 2),
+        ("$", Self::Read, 1),
+        ("!", Self::Show, 2),
     ];
 
     pub fn normal_form(&self, limit: usize) -> Option<Self> {

@@ -6,7 +6,7 @@ macro_rules! combinator {
 	(T) => { $crate::Combinator::T };
 	(+) => { $crate::Combinator::Add };
 	(=) => { $crate::Combinator::Eq };
-	(?) => { $crate::Combinator::Read };
+	($) => { $crate::Combinator::Read };
 	(!) => { $crate::Combinator::Show };
   ($x:literal) => {
     $crate::Combinator::N($x as i32)
