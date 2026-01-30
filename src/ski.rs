@@ -11,8 +11,8 @@ pub enum Combinator {
     Eq,
 
     // IO
-    Read,   // Read (\b -> f) ~> f n [where n is a byte read from stdin]
-    Show,   // Show b c       ~> c   [where n is a byte printed to stdout]
+    Read, // Read (\b -> f) ~> f n [where n is a byte read from stdin]
+    Show, // Show b c       ~> c   [where n is a byte printed to stdout]
 
     N(i32), // Number
 
@@ -33,7 +33,7 @@ impl Combinator {
         ("!", Self::Show, 2),
     ];
 
-    pub fn normal_form(&self, limit: usize) -> Option<Self> {
+    pub fn normal_form(&self, limit: Option<usize>) -> Option<Self> {
         let mut copy = self.clone();
 
         if copy.normalize(limit) {
@@ -67,17 +67,18 @@ impl Combinator {
         }
     }
 
-    pub fn normalize(&mut self, mut limit: usize) -> bool {
-        assert!(limit > 0);
+    pub fn normalize(&mut self, mut limit: Option<usize>) -> bool {
         self.normalize_with(&mut limit)
     }
 
-    fn normalize_with(&mut self, limit: &mut usize) -> bool {
-        if *limit == 0 {
+    fn normalize_with(&mut self, limit: &mut Option<usize>) -> bool {
+        if *limit == Some(0) {
             return false;
         }
 
-        *limit -= 1;
+        if let Some(limit) = limit {
+            *limit -= 1;
+        }
 
         use Combinator::*;
         match self {
@@ -99,7 +100,9 @@ impl Combinator {
 
                 [.., Named(_, _)] => {
                     let named = terms.last_mut().unwrap();
-                    named.normalize_with(limit);
+                    if !named.normalize_with(limit) {
+                        return false;
+                    }
 
                     self.reduce();
                     self.normalize_with(limit)
@@ -125,7 +128,9 @@ impl Combinator {
                     let _ = terms.pop().unwrap();
                     let mut b = terms.pop().unwrap();
 
-                    b.normalize_with(limit);
+                    if !b.normalize_with(limit) {
+                        return false;
+                    }
                     let N(b) = b else { unreachable!() };
 
                     print!("{}", b as u8 as char);
@@ -141,10 +146,13 @@ impl Combinator {
                 }
                 [ps @ .., _, T] => {
                     let nargs = ps.len();
-                    let _ = terms.pop().unwrap();
-                    let mut n = terms.pop().unwrap();
-                    n.normalize_with(limit);
+                    let len = terms.len();
+                    let n = &mut terms[len - 2];
+                    if !n.normalize_with(limit) {
+                        return false;
+                    }
                     let N(n) = n else { unreachable!() };
+                    let n = *n;
                     if n < 0 {
                         return false;
                     }
@@ -152,6 +160,9 @@ impl Combinator {
                     if nargs < (n + 1) as usize {
                         return terms.iter_mut().all(|n| n.normalize_with(limit));
                     }
+
+                    let _t = terms.pop();
+                    let _n = terms.pop();
 
                     let last = terms.len() - 1;
                     let f = terms.remove(last - n as usize);
@@ -209,8 +220,9 @@ impl Combinator {
                     let mut p = args.pop().unwrap();
                     let mut q = args.pop().unwrap();
 
-                    p.normalize_with(limit);
-                    q.normalize_with(limit);
+                    if !p.normalize_with(limit) || !q.normalize_with(limit) {
+                        return false;
+                    }
 
                     use Combinator::N;
                     let (N(p), N(q)) = (p, q) else { unreachable!() };
@@ -218,43 +230,27 @@ impl Combinator {
                     terms.push(N(p + q));
                     self.normalize_with(limit)
                 }
-
-                [_, _, _, S] | [_, _, K] => {
-                    self.reduce();
-                    self.normalize_with(limit)
-                }
-
                 [.., _x, _g, _f, S] => {
                     let _s = terms.pop().unwrap();
-                    let f = terms.pop().unwrap();
-                    let g = terms.pop().unwrap();
+                    let mut f = terms.pop().unwrap();
+                    let mut g = terms.pop().unwrap();
                     let x = terms.pop().unwrap();
 
-                    terms.push(App(vec![x, g, f, S]));
-
-                    let redex = terms.last_mut().unwrap();
-
-                    if redex.normalize_with(limit) {
-                        self.normalize_with(limit)
-                    } else {
-                        false
-                    }
+                    g.apply(x.clone());
+                    terms.push(g);
+                    f.apply(x);
+                    terms.push(f);
+                    self.normalize_with(limit)
                 }
 
                 [.., _y, _x, K] => {
                     let _k = terms.pop().unwrap();
                     let x = terms.pop().unwrap();
-                    let y = terms.pop().unwrap();
+                    let _y = terms.pop().unwrap();
 
-                    terms.push(App(vec![y, x, K]));
+                    terms.push(x);
 
-                    let redex = terms.last_mut().unwrap();
-
-                    if redex.normalize_with(limit) {
-                        self.normalize_with(limit)
-                    } else {
-                        false
-                    }
+                    self.normalize_with(limit)
                 }
 
                 _ => terms

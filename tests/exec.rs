@@ -5,8 +5,6 @@ const TEST_DIR: &'static str = "test_gen";
 #[test]
 #[allow(non_snake_case)]
 fn isomorphism() {
-    const LIMIT: usize = 1000;
-
     let B: Combinator = combinator!(S (K S) K);
     let C: Combinator = combinator!(S (S (K B) S) (K K));
     let W: Combinator = combinator!(S S (S K));
@@ -29,7 +27,7 @@ fn isomorphism() {
     for case in test_cases {
         println!("Case: {}", case);
         let expected = case
-            .normal_form(LIMIT)
+            .normal_form(None)
             .expect("Execution did not terminate in time");
         println!("  --> {}\n", expected);
 
