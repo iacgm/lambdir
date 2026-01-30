@@ -177,6 +177,33 @@ pub fn reduce_fs<P: AsRef<Path>>(path: P) -> bool {
                             create_dir(&out_path).unwrap();
                             create_dir(out_path.join(format!("N{}", s))).unwrap();
                         }
+                        Read => {
+                            // Read one byte from stdin
+                            let b = {
+                                use std::io::Read;
+                                let mut buf = [0];
+                                std::io::stdin().read_exact(&mut buf).unwrap();
+                                buf[0] as i32
+                            };
+                            let name = format!("N{}", b);
+                            remove_dir_all(&head_path).unwrap();
+                            safe_rename(nth(1), &head_path);
+                            create_dir_all(nth(1).join(name)).unwrap();
+                        }
+                        Show => {
+                            let x = &nth(1);
+                            if reduce_fs(x) {
+                                return true;
+                            }
+
+                            let child = &ls_dir(x)[0];
+                            let name = get_name(child);
+                            let n = name[1..].parse::<i32>().unwrap();
+                            print!("{}", n as u8 as char);
+
+                            remove_dir_all(head_path).unwrap();
+                            remove_dir_all(nth(1)).unwrap();
+                        }
                         N(0) => {
                             remove_dir_all(head_path).unwrap();
                             remove_dir_all(nth(1)).unwrap();

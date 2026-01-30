@@ -6,9 +6,13 @@ pub enum Combinator {
     K,
     Y,
 
-    T, // Tuple
+    T, // Tuple: T n a_1 .. a_n f ~> f a_1 .. a_n
     Add,
     Eq,
+
+    // IO
+    Read,   // Read (\b -> f) ~> f n [where n is a byte read from stdin]
+    Show,   // Show b c       ~> c   [where n is a byte printed to stdout]
 
     N(i32), // Number
 
@@ -25,6 +29,8 @@ impl Combinator {
         ("+", Self::Add, 2),
         ("=", Self::Eq, 2),
         ("T", Self::T, 1),
+        ("R", Self::Read, 1),
+        ("P", Self::Show, 2),
     ];
 
     pub fn normal_form(&self, limit: usize) -> Option<Self> {
@@ -96,6 +102,33 @@ impl Combinator {
                     named.normalize_with(limit);
 
                     self.reduce();
+                    self.normalize_with(limit)
+                }
+                [.., _f, Read] => {
+                    let _ = terms.pop().unwrap();
+                    let f = terms.pop().unwrap();
+
+                    // Read one byte from stdin
+                    let b = {
+                        use std::io::Read;
+                        let mut buf = [0];
+                        std::io::stdin().read_exact(&mut buf).unwrap();
+                        buf[0] as i32
+                    };
+
+                    terms.push(N(b));
+                    terms.push(f);
+
+                    self.normalize_with(limit)
+                }
+                [.., _c, _n, Show] => {
+                    let _ = terms.pop().unwrap();
+                    let mut b = terms.pop().unwrap();
+
+                    b.normalize_with(limit);
+                    let N(b) = b else { unreachable!() };
+
+                    print!("{}", b as u8 as char);
                     self.normalize_with(limit)
                 }
                 [.., _f, Y] => {
