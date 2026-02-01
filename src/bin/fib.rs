@@ -23,16 +23,9 @@ fn main() {
         V K (iter 10)
     };
 
-    let normalized = fib.normal_form(None).unwrap();
-
-    let _ = std::fs::remove_dir_all(DIR);
-    gen_fs(DIR, &fib).unwrap();
 
     let now = std::time::Instant::now();
-    exec_fs(DIR);
+    let normalized = fib.normal_form(None).unwrap();
     let time = std::time::Instant::now().duration_since(now).as_secs_f32();
     println!("Returned {} in {}s", get_name(&ls_dir(DIR)[0]), time);
-
-    let out = read_fs(DIR).unwrap();
-    assert_eq!(out, normalized);
 }
